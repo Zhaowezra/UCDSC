@@ -1,0 +1,49 @@
+#s/o https://marcobonzanini.com/2015/01/12/searching-pubmed-with-python/
+
+from Bio import Entrez
+import json
+
+def search(query):
+    Entrez.email = '__EMAIL__'
+    handle = Entrez.esearch(db='pubmed',
+                            api_key='__API_KEY__',
+                            #retstart/max used to page thru 400k+ results (100k at a time)
+                            retstart=0,
+                            retmax=100000,
+                            retmode='xml',
+                            term=query)
+    results = Entrez.read(handle)
+    return results
+#Next step is fetching details for all the retrieved articles via the efetch utility
+def fetch_details(id_list):
+    ids = ','.join(id_list)
+    Entrez.email = '__EMAIL__'
+    handle = Entrez.efetch(db='pubmed',
+                           api_key='__API_KEY__',
+                           retmode='xml',
+                           id=ids)
+    results = Entrez.read(handle)
+    return results
+
+if __name__ == '__main__':     
+    cois = []
+    results = search('hascois')
+    id_list = results['IdList']
+    papers = fetch_details(id_list)
+
+    for i, paper in enumerate(papers['PubmedArticle']):
+        
+        COI_dict = {}
+        COI_dict['cois'] = paper['MedlineCitation']['CoiStatement']
+        COI_dict['art_title'] = paper['MedlineCitation']['Article']['ArticleTitle']
+        COI_dict['journal'] = paper['MedlineCitation']['Article']['Journal']['Title']
+        COI_dict['pmid'] = paper['MedlineCitation']['PMID']
+        try:
+            COI_dict['pub_year'] = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate']['Year']
+        except KeyError: 
+            COI_dict['pub_year'] = paper['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate']['MedlineDate']
+
+
+        cois.append(COI_dict)
+    
+    json.dump(cois, open("COI_range427k.json", "w"), indent=4)
